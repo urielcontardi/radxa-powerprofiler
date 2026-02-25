@@ -6,5 +6,7 @@ services:
     restart: "no"
     environment:
       - REPORT_JSON_PATH=/data/report.json
+    ports:
+      - "5000:5000"
     volumes:
       - ./data:/data

@@ -12,4 +12,6 @@ COPY run_tests.py .
 # report.json será gravado aqui; use volume para persistir
 ENV PYTHONUNBUFFERED=1
 
+EXPOSE 5000
+
 CMD ["python3", "run_tests.py"]

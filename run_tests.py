@@ -11,6 +11,7 @@ Receita de teste:
   6. Repete ciclo 2-5 para quantas configs a receita definir
 
 Registra timestamps de cada evento e salva relatório em report.json.
+Também serve um dashboard web na porta 5000.
 """
 
 import os
@@ -19,19 +20,67 @@ import json
 import time
 import yaml
 import requests
+import threading
 from datetime import datetime, timezone
 from typing import Any
+from flask import Flask, jsonify, render_template_string
 
 EXPECTED_FW_PREFIX = "ST3001"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# ---------------------------------------------------------------------------
+# Estado Global para o Dashboard
+# ---------------------------------------------------------------------------
+class TestState:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.logs = []
+        self.current_step = "Iniciando..."
+        self.sensor_status = {}  # {sensor_id: "status"}
+        self.start_time = datetime.now(timezone.utc).isoformat()
+        self.events = []
+        self.is_running = True
+
+    def add_log(self, msg: str):
+        with self.lock:
+            self.logs.append(msg)
+            # Manter apenas os últimos 1000 logs
+            if len(self.logs) > 1000:
+                self.logs.pop(0)
+
+    def set_step(self, step_name: str):
+        with self.lock:
+            self.current_step = step_name
+
+    def update_sensor(self, sensor_id: str, status: str):
+        with self.lock:
+            self.sensor_status[sensor_id] = status
+
+    def add_event(self, event: dict):
+        with self.lock:
+            self.events.append(event)
+
+    def get_snapshot(self):
+        with self.lock:
+            return {
+                "current_step": self.current_step,
+                "start_time": self.start_time,
+                "logs": self.logs[-50:],  # Retorna últimos 50 logs para a UI
+                "sensor_status": self.sensor_status.copy(),
+                "is_running": self.is_running,
+                "events_count": len(self.events)
+            }
+
+STATE = TestState()
 
 # ---------------------------------------------------------------------------
 # Logging com timestamp
 # ---------------------------------------------------------------------------
 def log(msg: str) -> None:
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    print(f"[{ts}] {msg}", flush=True)
+    full_msg = f"[{ts}] {msg}"
+    print(full_msg, flush=True)
+    STATE.add_log(full_msg)
 
 
 # ---------------------------------------------------------------------------
@@ -110,14 +159,20 @@ class TestContext:
         self.sensor_ids = sensor_ids
         self.expected_config_revisions: dict[str, int] = {}
         self.events: list[dict] = []
+        
+        # Inicializa status dos sensores no dashboard
+        for sid in sensor_ids:
+            STATE.update_sensor(sid, "Aguardando...")
 
     def record(self, event: str, sensor_id: str = "", details: str = ""):
-        self.events.append({
+        evt = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "event": event,
             "sensor_id": sensor_id,
             "details": details,
-        })
+        }
+        self.events.append(evt)
+        STATE.add_event(evt)
 
     def save_report(self):
         path = os.environ.get("REPORT_JSON_PATH") or os.path.join(SCRIPT_DIR, "report.json")
@@ -150,13 +205,16 @@ def step_check_firmware_version(ctx: TestContext, step: dict) -> None:
             status = ctx.client.get_last_status(sid)
             if status is None:
                 log(f"  ✗ {sid}: sem resposta (ainda não na versão correta)")
+                STATE.update_sensor(sid, "Sem resposta")
                 all_ok = False
                 continue
             fw = status.get("firmwareVersion") or ""
             if fw.startswith(EXPECTED_FW_PREFIX):
                 log(f"  ✓ {sid}: {fw}")
+                STATE.update_sensor(sid, f"FW OK: {fw}")
             else:
                 log(f"  ✗ {sid}: {fw or 'sem firmwareVersion'}")
+                STATE.update_sensor(sid, f"FW Incorreto: {fw}")
                 all_ok = False
 
         if all_ok:
@@ -186,12 +244,14 @@ def step_send_config(ctx: TestContext, step: dict) -> None:
     log(f"Enviando config '{config_file}' para {len(ctx.sensor_ids)} sensores...")
 
     for sid in ctx.sensor_ids:
+        STATE.update_sensor(sid, f"Enviando config {config_file}...")
         # 1) Ler config atual para obter macAddress e idData do sensor
         try:
             current = ctx.client.get_config(sid)
             cur_cfg = current.get("config") or current
         except Exception as e:
             log(f"  ✗ {sid}: Erro ao ler config atual: {e}")
+            STATE.update_sensor(sid, "Erro ler config")
             ctx.record("send_config_error", sensor_id=sid, details=str(e))
             sys.exit(1)
 
@@ -209,6 +269,7 @@ def step_send_config(ctx: TestContext, step: dict) -> None:
             ctx.record("config_sent", sensor_id=sid, details=config_file)
         except requests.HTTPError as e:
             log(f"  ✗ {sid}: Erro ao enviar config: HTTP {e.response.status_code}")
+            STATE.update_sensor(sid, f"Erro enviar: {e.response.status_code}")
             ctx.record("send_config_error", sensor_id=sid, details=f"HTTP {e.response.status_code}")
             sys.exit(1)
 
@@ -219,9 +280,11 @@ def step_send_config(ctx: TestContext, step: dict) -> None:
             rev = rb_cfg.get("configRevision")
             ctx.expected_config_revisions[sid] = rev
             log(f"    {sid}: configRevision={rev}")
+            STATE.update_sensor(sid, f"Config enviada (rev {rev})")
             ctx.record("config_revision_captured", sensor_id=sid, details=f"configRevision={rev}")
         except Exception as e:
             log(f"  ✗ {sid}: Erro ao ler config de volta: {e}")
+            STATE.update_sensor(sid, "Erro ler rev")
             sys.exit(1)
 
     log("Config enviada e configRevision capturado para todos os sensores.")
@@ -256,13 +319,16 @@ def step_wait_config_applied(ctx: TestContext, step: dict) -> None:
             status = ctx.client.get_last_status(sid)
             if status is None:
                 log(f"  ✗ {sid}: sem resposta")
+                STATE.update_sensor(sid, "Sem resposta (wait)")
                 all_ok = False
                 continue
             actual_rev = status.get("configRevision")
             if actual_rev == expected_rev:
                 log(f"  ✓ {sid}: configRevision={actual_rev}")
+                STATE.update_sensor(sid, f"Config aplicada (rev {actual_rev})")
             else:
                 log(f"  ✗ {sid}: configRevision={actual_rev} (esperado {expected_rev})")
+                STATE.update_sensor(sid, f"Aguardando rev {expected_rev} (atual {actual_rev})")
                 all_ok = False
 
         if all_ok:
@@ -301,9 +367,16 @@ def step_wait_timer(ctx: TestContext, step: dict) -> None:
         remaining = total_s - (time.time() - start)
         if remaining <= 0:
             break
+        
+        # Atualiza status de todos os sensores para indicar que estão em teste
+        elapsed_h = (time.time() - start) / 3600
+        remaining_h = remaining / 3600
+        status_msg = f"Em teste: {label} (decorrido {elapsed_h:.1f}h, falta {remaining_h:.1f}h)"
+        for sid in ctx.sensor_ids:
+            STATE.update_sensor(sid, status_msg)
+
         sleep_chunk = min(600, remaining)
         time.sleep(sleep_chunk)
-        elapsed_h = (time.time() - start) / 3600
         log(f"  Timer: {elapsed_h:.1f}h de {label}")
 
     ctx.record("timer_finished", details=label)
@@ -322,7 +395,7 @@ STEP_HANDLERS = {
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Runner
 # ---------------------------------------------------------------------------
 def load_execution_list() -> dict[str, Any]:
     path = os.path.join(SCRIPT_DIR, "execution_list.yaml")
@@ -330,46 +403,162 @@ def load_execution_list() -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
-def main() -> None:
-    cfg = load_config()
-    iot = cfg.get("iot") or {}
-    base_url = os.environ.get("IOT_API_BASE_URL") or iot.get("base_url") or "https://iot.int.tractian.com"
-    user_id = os.environ.get("IOT_X_USER_ID") or iot.get("x_user_id") or ""
-    if not user_id:
-        raise SystemExit("Defina IOT_X_USER_ID (env) ou iot.x_user_id em config.yaml")
+def run_tests() -> None:
+    try:
+        cfg = load_config()
+        iot = cfg.get("iot") or {}
+        base_url = os.environ.get("IOT_API_BASE_URL") or iot.get("base_url") or "https://iot.int.tractian.com"
+        user_id = os.environ.get("IOT_X_USER_ID") or iot.get("x_user_id") or ""
+        if not user_id:
+            msg = "Defina IOT_X_USER_ID (env) ou iot.x_user_id em config.yaml"
+            log(msg)
+            STATE.set_step(f"ERRO: {msg}")
+            return
 
-    sensor_ids = get_sensor_ids()
-    client = IoTClient(base_url, user_id)
-    ctx = TestContext(client, sensor_ids)
+        sensor_ids = get_sensor_ids()
+        client = IoTClient(base_url, user_id)
+        ctx = TestContext(client, sensor_ids)
 
-    execution = load_execution_list()
-    steps = execution.get("steps") or []
+        execution = load_execution_list()
+        steps = execution.get("steps") or []
 
-    log(f"=== {execution.get('name', 'Power Profiler')} ===")
-    log(f"Sensores: {sensor_ids}")
-    log(f"Etapas: {len(steps)}")
-    ctx.record("test_started", details=f"sensors={','.join(sensor_ids)}")
-    print()
+        log(f"=== {execution.get('name', 'Power Profiler')} ===")
+        log(f"Sensores: {sensor_ids}")
+        log(f"Etapas: {len(steps)}")
+        ctx.record("test_started", details=f"sensors={','.join(sensor_ids)}")
+        
+        for i, step in enumerate(steps, 1):
+            step_id = step.get("id")
+            step_name = step.get("name", step_id)
+            log(f"[{i}/{len(steps)}] {step_name}")
+            STATE.set_step(f"[{i}/{len(steps)}] {step_name}")
+            ctx.record("step_started", details=f"{step_id}: {step_name}")
 
-    for i, step in enumerate(steps, 1):
-        step_id = step.get("id")
-        step_name = step.get("name", step_id)
-        log(f"[{i}/{len(steps)}] {step_name}")
-        ctx.record("step_started", details=f"{step_id}: {step_name}")
+            handler = STEP_HANDLERS.get(step_id) if step_id else None
+            if handler is None:
+                log(f"  (handler não implementado: {step_id}, pulando)")
+                continue
 
-        handler = STEP_HANDLERS.get(step_id) if step_id else None
-        if handler is None:
-            log(f"  (handler não implementado: {step_id}, pulando)")
-            continue
+            handler(ctx, step)
+            ctx.record("step_completed", details=f"{step_id}: {step_name}")
 
-        handler(ctx, step)
-        ctx.record("step_completed", details=f"{step_id}: {step_name}")
-        print()
+        ctx.record("test_completed")
+        log("=== Execução concluída com sucesso ===")
+        STATE.set_step("Concluído com sucesso")
+        ctx.save_report()
+    except Exception as e:
+        log(f"ERRO FATAL: {e}")
+        STATE.set_step(f"ERRO FATAL: {e}")
+    finally:
+        STATE.is_running = False
 
-    ctx.record("test_completed")
-    log("=== Execução concluída com sucesso ===")
-    ctx.save_report()
 
+# ---------------------------------------------------------------------------
+# Web Server (Flask)
+# ---------------------------------------------------------------------------
+app = Flask(__name__)
 
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Profiler Dashboard</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f4f4f9; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { margin-top: 0; color: #2c3e50; }
+        .status-box { background: #e8f4f8; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 5px solid #3498db; }
+        .status-label { font-weight: bold; color: #555; }
+        .status-value { font-size: 1.2em; color: #2c3e50; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; color: #666; }
+        .logs { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 6px; height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
+        .log-entry { margin-bottom: 4px; border-bottom: 1px solid #34495e; padding-bottom: 2px; }
+        .refresh-info { font-size: 0.8em; color: #888; text-align: right; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Power Profiler Dashboard</h1>
+        
+        <div class="status-box">
+            <div><span class="status-label">Etapa Atual:</span> <span id="current-step" class="status-value">Carregando...</span></div>
+            <div style="margin-top: 10px;"><span class="status-label">Início:</span> <span id="start-time">...</span></div>
+            <div><span class="status-label">Status:</span> <span id="running-status">...</span></div>
+        </div>
+
+        <h2>Sensores</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Sensor ID</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="sensor-table">
+                <!-- Preenchido via JS -->
+            </tbody>
+        </table>
+
+        <h2>Logs Recentes</h2>
+        <div class="logs" id="logs-container">
+            <!-- Preenchido via JS -->
+        </div>
+        <div class="refresh-info">Atualizado automaticamente a cada 2s</div>
+    </div>
+
+    <script>
+        function updateDashboard() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('current-step').textContent = data.current_step;
+                    document.getElementById('start-time').textContent = new Date(data.start_time).toLocaleString();
+                    document.getElementById('running-status').textContent = data.is_running ? "Executando" : "Parado";
+                    
+                    // Atualiza tabela de sensores
+                    const tbody = document.getElementById('sensor-table');
+                    tbody.innerHTML = '';
+                    for (const [id, status] of Object.entries(data.sensor_status)) {
+                        const row = `<tr><td>${id}</td><td>${status}</td></tr>`;
+                        tbody.innerHTML += row;
+                    }
+
+                    // Atualiza logs
+                    const logsContainer = document.getElementById('logs-container');
+                    logsContainer.innerHTML = data.logs.map(log => `<div class="log-entry">${log}</div>`).join('');
+                    // Auto-scroll se estiver perto do fim (opcional, aqui forçando scroll)
+                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                })
+                .catch(err => console.error('Erro ao atualizar:', err));
+        }
+
+        setInterval(updateDashboard, 2000);
+        updateDashboard();
+    </script>
+</body>
+</html>
+"""
+
+@app.route('/')
+def index():
+    return render_template_string(HTML_TEMPLATE)
+
+@app.route('/status')
+def status():
+    return jsonify(STATE.get_snapshot())
+
+# ---------------------------------------------------------------------------
+# Main Entry Point
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    main()
+    # Inicia os testes em uma thread separada
+    test_thread = threading.Thread(target=run_tests, daemon=True)
+    test_thread.start()
+
+    # Inicia o servidor web na thread principal
+    print("Iniciando dashboard web na porta 5000...", flush=True)
+    app.run(host='0.0.0.0', port=5000)

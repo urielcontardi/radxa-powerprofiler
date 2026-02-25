@@ -28,8 +28,12 @@ Opcional no `.env`: `IOT_API_BASE_URL`, `SENSOR_IDS`.
 docker compose up --build -d
 ```
 
-Pronto. O container roda a receita (configs 1–4, 3h cada). Logs:
+Pronto. O container roda a receita (configs 1–4, 3h cada).
 
+**Dashboard Web:**
+Acesse `http://<IP_DA_RADXA>:5000` no seu navegador para ver o status dos testes, etapa atual e logs.
+
+Logs no terminal:
 ```bash
 docker compose logs -f
 ```
