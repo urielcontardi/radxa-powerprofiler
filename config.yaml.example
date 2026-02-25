@@ -3,9 +3,17 @@
 
 iot:
   base_url: "https://iot.int.tractian.com"
-  x_user_id: "seu-user-id-aqui"
+  x_user_id: "68a3151b331cccc93f99ad8b"
 
-# IDs dos sensores SmartTrac G2 para o teste
+# IDs dos sensores SmartTrac G2 para o teste (devem estar na versão ST3001*)
 sensor_ids:
-  - "YEH8051"
-  # - "OUTRO_ID"
+  - "RBT9269"
+  - "PNI6508"
+  - "DJE0269"
+  - "SCE1196"
+  - "QPE6415"
+  - "QJG6843"
+  - "JHS6915"
+  - "XIK4799"
+  - "KCC4196"
+  - "LHF1992"

@@ -1,17 +1,90 @@
-# Lista de execução - Teste SmartTrac G2
-# Cada step é executado em ordem. O script segue esta lista.
+# ============================================================================
+# Receita de execução - Teste SmartTrac G2
+# ============================================================================
+# Tipos de etapa disponíveis:
+#
+#   check_firmware_version  - Verifica firmware ST3001* via last status
+#     retry_interval_minutes: intervalo entre tentativas (default: 1)
+#     max_attempts: limite de tentativas (omitir = infinito)
+#
+#   send_config             - Envia JSON de config para todos os sensores
+#     config_file: caminho do JSON (relativo ao projeto, ex: configs/config_1.json)
+#     (macAddress, deviceId, idData, configRevision são preenchidos automaticamente)
+#
+#   wait_config_applied     - Aguarda todos aplicarem a config (configRevision no last status)
+#     retry_interval_minutes: intervalo entre tentativas (default: 1)
+#     max_attempts: limite de tentativas (omitir = infinito)
+#
+#   wait_timer              - Timer de espera
+#     duration_hours: horas (default: 0)
+#     duration_minutes: minutos (default: 0)
+#
+# Para adicionar mais ciclos de config, basta repetir o bloco send_config →
+# wait_config_applied → wait_timer com outro config_file.
+# ============================================================================
 
 name: "Power Profiler - SmartTrac G2"
-description: "Teste de sensores SmartTrac G2 com verificação de versão"
 
 steps:
-  # Parte 1: Garantir que todos os sensores estão na mesma versão (last status)
-  - id: check_sensor_versions
-    name: "Verificar versão dos sensores (last status)"
-    description: "Obtém last status de cada sensor e garante que todos estão na mesma versão."
-    required: true
+  # --- Etapa 1: Verificar firmware ---
+  - id: check_firmware_version
+    name: "1. Verificar firmware ST3001*"
+    retry_interval_minutes: 1
 
-  # Placeholder para próximos passos do teste
-  # - id: step_2
-  #   name: "Próximo passo"
-  #   required: true
+  # --- Etapa 2: Enviar config 1 ---
+  - id: send_config
+    name: "2. Enviar config 1"
+    config_file: "configs/config_1.json"
+
+  # --- Etapa 3: Aguardar sensores aplicarem config 1 ---
+  - id: wait_config_applied
+    name: "3. Aguardar sensores aplicarem config 1"
+    retry_interval_minutes: 1
+
+  # --- Etapa 4: Timer rodando com config 1 ---
+  - id: wait_timer
+    name: "4. Rodando com config 1"
+    duration_hours: 3
+    duration_minutes: 0
+
+  # --- Config 2 ---
+  - id: send_config
+    name: "5. Enviar config 2"
+    config_file: "configs/config_2.json"
+
+  - id: wait_config_applied
+    name: "6. Aguardar sensores aplicarem config 2"
+    retry_interval_minutes: 1
+
+  - id: wait_timer
+    name: "7. Rodando com config 2"
+    duration_hours: 3
+    duration_minutes: 0
+
+  # --- Config 3 ---
+  - id: send_config
+    name: "8. Enviar config 3"
+    config_file: "configs/config_3.json"
+
+  - id: wait_config_applied
+    name: "9. Aguardar sensores aplicarem config 3"
+    retry_interval_minutes: 1
+
+  - id: wait_timer
+    name: "10. Rodando com config 3"
+    duration_hours: 3
+    duration_minutes: 0
+
+  # --- Config 4 ---
+  - id: send_config
+    name: "11. Enviar config 4"
+    config_file: "configs/config_4.json"
+
+  - id: wait_config_applied
+    name: "12. Aguardar sensores aplicarem config 4"
+    retry_interval_minutes: 1
+
+  - id: wait_timer
+    name: "13. Rodando com config 4"
+    duration_hours: 3
+    duration_minutes: 0

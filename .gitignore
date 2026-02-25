@@ -29,6 +29,7 @@ Thumbs.db
 logs/
 output/
 *.csv
+report.json
 
 # Secrets (nunca commitar tokens)
 *.pem
