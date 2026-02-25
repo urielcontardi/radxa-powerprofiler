@@ -37,7 +37,7 @@ class TestState:
         self.logs = []
         self.current_step = "Iniciando..."
         self.sensor_status = {}  # {sensor_id: "status"}
-        self.start_time = datetime.now(timezone.utc).isoformat()
+        self.start_time = datetime.now().isoformat()
         self.events = []
         self.is_running = True
 
@@ -77,7 +77,8 @@ STATE = TestState()
 # Logging com timestamp
 # ---------------------------------------------------------------------------
 def log(msg: str) -> None:
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Use local time (container time)
+    ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     full_msg = f"[{ts}] {msg}"
     print(full_msg, flush=True)
     STATE.add_log(full_msg)
@@ -166,7 +167,7 @@ class TestContext:
 
     def record(self, event: str, sensor_id: str = "", details: str = ""):
         evt = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now().isoformat(),
             "event": event,
             "sensor_id": sensor_id,
             "details": details,
