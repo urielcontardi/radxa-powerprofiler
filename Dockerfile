@@ -1,12 +1,15 @@
-# Power Profiler - SmartTrac G2 test runner
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY configs/ configs/
+COPY execution_list.yaml .
+COPY run_tests.py .
 
-# Variáveis de ambiente na execução: IOT_API_BASE_URL, IOT_X_USER_ID, SENSOR_IDS (ou config)
-ENTRYPOINT ["python", "-u", "run_tests.py"]
+# report.json será gravado aqui; use volume para persistir
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python3", "run_tests.py"]

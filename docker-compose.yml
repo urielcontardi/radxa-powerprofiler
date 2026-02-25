@@ -1,0 +1,10 @@
+services:
+  powerprofiler:
+    build: .
+    env_file: .env
+    container_name: powerprofiler
+    restart: "no"
+    environment:
+      - REPORT_JSON_PATH=/data/report.json
+    volumes:
+      - ./data:/data

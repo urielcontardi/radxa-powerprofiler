@@ -120,7 +120,7 @@ class TestContext:
         })
 
     def save_report(self):
-        path = os.path.join(SCRIPT_DIR, "report.json")
+        path = os.environ.get("REPORT_JSON_PATH") or os.path.join(SCRIPT_DIR, "report.json")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(self.events, f, indent=2, ensure_ascii=False)
         log(f"Relatório salvo em {path}")
