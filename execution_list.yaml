@@ -1,0 +1,17 @@
+# Lista de execução - Teste SmartTrac G2
+# Cada step é executado em ordem. O script segue esta lista.
+
+name: "Power Profiler - SmartTrac G2"
+description: "Teste de sensores SmartTrac G2 com verificação de versão"
+
+steps:
+  # Parte 1: Garantir que todos os sensores estão na mesma versão (last status)
+  - id: check_sensor_versions
+    name: "Verificar versão dos sensores (last status)"
+    description: "Obtém last status de cada sensor e garante que todos estão na mesma versão."
+    required: true
+
+  # Placeholder para próximos passos do teste
+  # - id: step_2
+  #   name: "Próximo passo"
+  #   required: true

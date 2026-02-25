@@ -1,0 +1,11 @@
+# Copie para config.yaml e preencha.
+# Ou use variáveis de ambiente: IOT_API_BASE_URL, IOT_X_USER_ID, SENSOR_IDS
+
+iot:
+  base_url: "https://iot.int.tractian.com"
+  x_user_id: "seu-user-id-aqui"
+
+# IDs dos sensores SmartTrac G2 para o teste
+sensor_ids:
+  - "YEH8051"
+  # - "OUTRO_ID"
