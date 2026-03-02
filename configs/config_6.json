@@ -41,19 +41,37 @@
     },
     "signalConfig": {
       "mainAccelRemap": {
-        "xFromX": 1, "xFromY": 0, "xFromZ": 0,
-        "yFromX": 0, "yFromY": 1, "yFromZ": 0,
-        "zFromX": 0, "zFromY": 0, "zFromZ": 1
+        "xFromX": 1,
+        "xFromY": 0,
+        "xFromZ": 0,
+        "yFromX": 0,
+        "yFromY": 1,
+        "yFromZ": 0,
+        "zFromX": 0,
+        "zFromY": 0,
+        "zFromZ": 1
       },
       "auxAccelRemap": {
-        "xFromX": 1, "xFromY": 0, "xFromZ": 0,
-        "yFromX": 0, "yFromY": 1, "yFromZ": 0,
-        "zFromX": 0, "zFromY": 0, "zFromZ": 1
+        "xFromX": 1,
+        "xFromY": 0,
+        "xFromZ": 0,
+        "yFromX": 0,
+        "yFromY": 1,
+        "yFromZ": 0,
+        "zFromX": 0,
+        "zFromY": 0,
+        "zFromZ": 1
       },
       "magnetometerRemap": {
-        "xFromX": 1, "xFromY": 0, "xFromZ": 0,
-        "yFromX": 0, "yFromY": 1, "yFromZ": 0,
-        "zFromX": 0, "zFromY": 0, "zFromZ": 1
+        "xFromX": 1,
+        "xFromY": 0,
+        "xFromZ": 0,
+        "yFromX": 0,
+        "yFromY": 1,
+        "yFromZ": 0,
+        "zFromX": 0,
+        "zFromY": 0,
+        "zFromZ": 1
       },
       "mainAccelCorrectionZpkX": null,
       "mainAccelCorrectionZpkY": null,
@@ -68,32 +86,52 @@
         "numStages": 4,
         "stages": [
           {
-            "zero1Real": -62831852, "zero1Imaginary": 0,
-            "zero2Real": -62831852, "zero2Imaginary": 0,
-            "pole1Real": -86560.95, "pole1Imaginary": 208976.62,
-            "pole2Real": -86560.95, "pole2Imaginary": -208976.62,
-            "k": 1.679616e-10, "frequencyHz": 36000
+            "zero1Real": -62831852,
+            "zero1Imaginary": 0,
+            "zero2Real": -62831852,
+            "zero2Imaginary": 0,
+            "pole1Real": -86560.95,
+            "pole1Imaginary": 208976.62,
+            "pole2Real": -86560.95,
+            "pole2Imaginary": -208976.62,
+            "k": 1.679616e-10,
+            "frequencyHz": 36000
           },
           {
-            "zero1Real": -62831852, "zero1Imaginary": 0,
-            "zero2Real": -62831852, "zero2Imaginary": 0,
-            "pole1Real": -208976.62, "pole1Imaginary": 86560.95,
-            "pole2Real": -208976.62, "pole2Imaginary": -86560.95,
-            "k": 1, "frequencyHz": 36000
+            "zero1Real": -62831852,
+            "zero1Imaginary": 0,
+            "zero2Real": -62831852,
+            "zero2Imaginary": 0,
+            "pole1Real": -208976.62,
+            "pole1Imaginary": 86560.95,
+            "pole2Real": -208976.62,
+            "pole2Imaginary": -86560.95,
+            "k": 1,
+            "frequencyHz": 36000
           },
           {
-            "zero1Real": 0, "zero1Imaginary": 0,
-            "zero2Real": 0, "zero2Imaginary": 0,
-            "pole1Real": -69729.66, "pole1Imaginary": -168342.28,
-            "pole2Real": -69729.66, "pole2Imaginary": 168342.28,
-            "k": 1, "frequencyHz": 29000
+            "zero1Real": 0,
+            "zero1Imaginary": 0,
+            "zero2Real": 0,
+            "zero2Imaginary": 0,
+            "pole1Real": -69729.66,
+            "pole1Imaginary": -168342.28,
+            "pole2Real": -69729.66,
+            "pole2Imaginary": 168342.28,
+            "k": 1,
+            "frequencyHz": 29000
           },
           {
-            "zero1Real": 0, "zero1Imaginary": 0,
-            "zero2Real": 0, "zero2Imaginary": 0,
-            "pole1Real": -168342.28, "pole1Imaginary": -69729.66,
-            "pole2Real": -168342.28, "pole2Imaginary": 69729.66,
-            "k": 1, "frequencyHz": 29000
+            "zero1Real": 0,
+            "zero1Imaginary": 0,
+            "zero2Real": 0,
+            "zero2Imaginary": 0,
+            "pole1Real": -168342.28,
+            "pole1Imaginary": -69729.66,
+            "pole2Real": -168342.28,
+            "pole2Imaginary": 69729.66,
+            "k": 1,
+            "frequencyHz": 29000
           }
         ],
         "gain": 1,
@@ -107,7 +145,7 @@
     "periodicConfig": [
       {
         "idData": "5YSDywZyRm2l28amu3nwPRER",
-        "periodS": 900,
+        "periodS": 90,
         "syncTimestamp": "2026-01-29T12:00:00Z",
         "uptimeThresholdXG": 0.0,
         "uptimeThresholdYG": 0.0,
@@ -166,14 +204,26 @@
           "bypassGlobalPiezoCorrectionFilter": false,
           "bypassGlobalMainAccelSpeedCorrectionFilter": false,
           "sampleMainAccelRemap": {
-            "xFromX": 1, "xFromY": 0, "xFromZ": 0,
-            "yFromX": 0, "yFromY": 1, "yFromZ": 0,
-            "zFromX": 0, "zFromY": 0, "zFromZ": 1
+            "xFromX": 1,
+            "xFromY": 0,
+            "xFromZ": 0,
+            "yFromX": 0,
+            "yFromY": 1,
+            "yFromZ": 0,
+            "zFromX": 0,
+            "zFromY": 0,
+            "zFromZ": 1
           },
           "sampleMagnetometerRemap": {
-            "xFromX": 1, "xFromY": 0, "xFromZ": 0,
-            "yFromX": 0, "yFromY": 1, "yFromZ": 0,
-            "zFromX": 0, "zFromY": 0, "zFromZ": 1
+            "xFromX": 1,
+            "xFromY": 0,
+            "xFromZ": 0,
+            "yFromX": 0,
+            "yFromY": 1,
+            "yFromZ": 0,
+            "zFromX": 0,
+            "zFromY": 0,
+            "zFromZ": 1
           },
           "bypassGlobalMainAccelRemap": false,
           "bypassGlobalMagnetometerRemap": false,
@@ -184,7 +234,7 @@
       },
       {
         "idData": "5YSDywZyRm2l28amu3nwPRER",
-        "periodS": 7200,
+        "periodS": 720,
         "syncTimestamp": "2026-01-29T12:00:00Z",
         "uptimeThresholdXG": 0.0,
         "uptimeThresholdYG": 0.0,
@@ -243,14 +293,26 @@
           "bypassGlobalPiezoCorrectionFilter": false,
           "bypassGlobalMainAccelSpeedCorrectionFilter": false,
           "sampleMainAccelRemap": {
-            "xFromX": 1, "xFromY": 0, "xFromZ": 0,
-            "yFromX": 0, "yFromY": 1, "yFromZ": 0,
-            "zFromX": 0, "zFromY": 0, "zFromZ": 1
+            "xFromX": 1,
+            "xFromY": 0,
+            "xFromZ": 0,
+            "yFromX": 0,
+            "yFromY": 1,
+            "yFromZ": 0,
+            "zFromX": 0,
+            "zFromY": 0,
+            "zFromZ": 1
           },
           "sampleMagnetometerRemap": {
-            "xFromX": 1, "xFromY": 0, "xFromZ": 0,
-            "yFromX": 0, "yFromY": 1, "yFromZ": 0,
-            "zFromX": 0, "zFromY": 0, "zFromZ": 1
+            "xFromX": 1,
+            "xFromY": 0,
+            "xFromZ": 0,
+            "yFromX": 0,
+            "yFromY": 1,
+            "yFromZ": 0,
+            "zFromX": 0,
+            "zFromY": 0,
+            "zFromZ": 1
           },
           "bypassGlobalMainAccelRemap": false,
           "bypassGlobalMagnetometerRemap": false,
@@ -259,9 +321,9 @@
           "iepeExcitationCurrentMa": 0
         }
       },
-      { 
+      {
         "idData": "5YSDywZyRm2l28amu3nwPRER",
-        "periodS": 43200,
+        "periodS": 4320,
         "syncTimestamp": "2026-01-29T12:00:00Z",
         "uptimeThresholdXG": 0.0,
         "uptimeThresholdYG": 0.0,
@@ -320,14 +382,26 @@
           "bypassGlobalPiezoCorrectionFilter": false,
           "bypassGlobalMainAccelSpeedCorrectionFilter": false,
           "sampleMainAccelRemap": {
-            "xFromX": 1, "xFromY": 0, "xFromZ": 0,
-            "yFromX": 0, "yFromY": 1, "yFromZ": 0,
-            "zFromX": 0, "zFromY": 0, "zFromZ": 1
+            "xFromX": 1,
+            "xFromY": 0,
+            "xFromZ": 0,
+            "yFromX": 0,
+            "yFromY": 1,
+            "yFromZ": 0,
+            "zFromX": 0,
+            "zFromY": 0,
+            "zFromZ": 1
           },
           "sampleMagnetometerRemap": {
-            "xFromX": 1, "xFromY": 0, "xFromZ": 0,
-            "yFromX": 0, "yFromY": 1, "yFromZ": 0,
-            "zFromX": 0, "zFromY": 0, "zFromZ": 1
+            "xFromX": 1,
+            "xFromY": 0,
+            "xFromZ": 0,
+            "yFromX": 0,
+            "yFromY": 1,
+            "yFromZ": 0,
+            "zFromX": 0,
+            "zFromY": 0,
+            "zFromZ": 1
           },
           "bypassGlobalMainAccelRemap": false,
           "bypassGlobalMagnetometerRemap": false,

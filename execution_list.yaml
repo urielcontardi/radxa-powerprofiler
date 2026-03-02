@@ -1,90 +1,183 @@
 # ============================================================================
-# Receita de execução - Teste SmartTrac G2
-# ============================================================================
-# Tipos de etapa disponíveis:
+# Receita de execução - Calibração SmartTrac G2
+# Objetivo: medir os parâmetros do modelo de energia para a calculadora
 #
+# Modelo:
+#   P_device = P_sleep
+#            + (1/T_tx)    × [β₀ + β₁ × payload_bytes]
+#            + (1/T_sense) × [E_accel(rate, N) + E_mag(N) + E_piezo(N)]
+#
+# Todos os configs de calibração têm T_sense = T_tx = 600s (1 aquisição/ciclo TX).
+# Cada janela roda 20 min ≈ 2 ciclos de TX completos.
+# Tempo total estimado: ~3h (inclui transições e verificação de firmware).
+#
+# Tipos de etapa disponíveis:
 #   check_firmware_version  - Verifica firmware ST3001* via last status
 #     retry_interval_minutes: intervalo entre tentativas (default: 1)
 #     max_attempts: limite de tentativas (omitir = infinito)
 #
 #   send_config             - Envia JSON de config para todos os sensores
-#     config_file: caminho do JSON (relativo ao projeto, ex: configs/config_1.json)
-#     (macAddress, deviceId, idData, configRevision são preenchidos automaticamente)
+#     config_file: caminho do JSON (relativo ao projeto)
 #
-#   wait_config_applied     - Aguarda todos aplicarem a config (configRevision no last status)
+#   wait_config_applied     - Aguarda todos aplicarem a config
 #     retry_interval_minutes: intervalo entre tentativas (default: 1)
 #     max_attempts: limite de tentativas (omitir = infinito)
 #
 #   wait_timer              - Timer de espera
 #     duration_hours: horas (default: 0)
 #     duration_minutes: minutos (default: 0)
-#
-# Para adicionar mais ciclos de config, basta repetir o bloco send_config →
-# wait_config_applied → wait_timer com outro config_file.
+#     purpose: descrição do que está sendo medido (aparece no relatório)
 # ============================================================================
 
-name: "Power Profiler - SmartTrac G2"
+name: "Power Profiler - Calibração SmartTrac G2"
 
 steps:
-  # --- Etapa 1: Verificar firmware ---
+  # ---------------------------------------------------------------------------
   - id: check_firmware_version
     name: "1. Verificar firmware ST3001*"
     retry_interval_minutes: 1
 
-  # --- Etapa 2: Enviar config 1 ---
+  # ---------------------------------------------------------------------------
+  # [G0] Baseline rádio — sem sensing
+  # Mede: P_sleep + β₀/600
+  # ---------------------------------------------------------------------------
   - id: send_config
-    name: "2. Enviar config 1"
+    name: "2. Enviar config_1 [Baseline: rádio apenas]"
     config_file: "configs/config_1.json"
 
-  # --- Etapa 3: Aguardar sensores aplicarem config 1 ---
   - id: wait_config_applied
-    name: "3. Aguardar sensores aplicarem config 1"
+    name: "3. Aguardar config_1 aplicada"
     retry_interval_minutes: 1
 
-  # --- Etapa 4: Timer rodando com config 1 ---
   - id: wait_timer
-    name: "4. Rodando com config 1"
-    duration_hours: 3
+    name: "4. Rodando config_1 [Baseline: rádio apenas]"
+    purpose: "Baseline: P_sleep + β₀. Sem sensing, TX a cada 600s."
+    duration_hours: 1
     duration_minutes: 0
 
-  # --- Config 2 ---
+  # ---------------------------------------------------------------------------
+  # [GA] Todos os sensores, stats — referência sensing + custo TX stats
+  # Mede: P_sleep + β₀/600 + β₁·N_stats/600 + (E_accel+E_mag+E_piezo)/600
+  # ---------------------------------------------------------------------------
   - id: send_config
-    name: "5. Enviar config 2"
-    config_file: "configs/config_2.json"
+    name: "5. Enviar config_11 [Todos sensores | 16kHz/32768 | stats]"
+    config_file: "configs/config_11.json"
 
   - id: wait_config_applied
-    name: "6. Aguardar sensores aplicarem config 2"
+    name: "6. Aguardar config_11 aplicada"
     retry_interval_minutes: 1
 
   - id: wait_timer
-    name: "7. Rodando com config 2"
-    duration_hours: 3
+    name: "7. Rodando config_11 [Todos sensores | 16kHz/32768 | stats]"
+    purpose: "Todos sensores stats. P11-P1 = E_sense_total/600 + ΔE_radio_stats/600."
+    duration_hours: 1
     duration_minutes: 0
 
-  # --- Config 3 ---
+  # ---------------------------------------------------------------------------
+  # [GA] Todos os sensores, waveform+stats — isola custo TX de waveform (β₁)
+  # P_12 - P_11 = ΔE_radio_waveform / 600  →  β₁ = ΔE / Δbytes
+  # ---------------------------------------------------------------------------
   - id: send_config
-    name: "8. Enviar config 3"
-    config_file: "configs/config_3.json"
+    name: "8. Enviar config_12 [Todos sensores | 16kHz/32768 | waveform+stats]"
+    config_file: "configs/config_12.json"
 
   - id: wait_config_applied
-    name: "9. Aguardar sensores aplicarem config 3"
+    name: "9. Aguardar config_12 aplicada"
     retry_interval_minutes: 1
 
   - id: wait_timer
-    name: "10. Rodando com config 3"
-    duration_hours: 3
+    name: "10. Rodando config_12 [Todos sensores | 16kHz/32768 | waveform+stats]"
+    purpose: "Waveform+stats. P12-P11 = custo TX waveform/600. Calibra β₁."
+    duration_hours: 1
     duration_minutes: 0
 
-  # --- Config 4 ---
+  # ---------------------------------------------------------------------------
+  # [GB] Acelerômetro isolado, 16kHz/32768 — isola E_accel a 16kHz
+  # (P_13 - P_1) × 600 = E_accel_16k + E_radio_accel_stats
+  # ---------------------------------------------------------------------------
   - id: send_config
-    name: "11. Enviar config 4"
-    config_file: "configs/config_4.json"
+    name: "11. Enviar config_13 [Accel only | 16kHz/32768 | stats]"
+    config_file: "configs/config_13.json"
 
   - id: wait_config_applied
-    name: "12. Aguardar sensores aplicarem config 4"
+    name: "12. Aguardar config_13 aplicada"
     retry_interval_minutes: 1
 
   - id: wait_timer
-    name: "13. Rodando com config 4"
-    duration_hours: 3
+    name: "13. Rodando config_13 [Accel only | 16kHz/32768 | stats]"
+    purpose: "Accel isolado 16kHz. (P13-P1)×600 = E_accel_16k + TX_stats_accel."
+    duration_hours: 1
+    duration_minutes: 0
+
+  # ---------------------------------------------------------------------------
+  # [GB] Magnetômetro isolado, 1400Hz/2048 — isola E_mag
+  # (P_14 - P_1) × 600 = E_mag + E_radio_mag_stats
+  # ---------------------------------------------------------------------------
+  - id: send_config
+    name: "14. Enviar config_14 [Mag only | 1400Hz/2048 | stats]"
+    config_file: "configs/config_14.json"
+
+  - id: wait_config_applied
+    name: "15. Aguardar config_14 aplicada"
+    retry_interval_minutes: 1
+
+  - id: wait_timer
+    name: "16. Rodando config_14 [Mag only | 1400Hz/2048 | stats]"
+    purpose: "Magnetômetro isolado. (P14-P1)×600 = E_mag + TX_stats_mag."
+    duration_hours: 1
+    duration_minutes: 0
+
+  # ---------------------------------------------------------------------------
+  # [GB] Piezo isolado, 200kHz/32768 — isola E_piezo
+  # (P_15 - P_1) × 600 = E_piezo + E_radio_piezo_stats
+  # ---------------------------------------------------------------------------
+  - id: send_config
+    name: "17. Enviar config_15 [Piezo only | 200kHz/32768 | stats]"
+    config_file: "configs/config_15.json"
+
+  - id: wait_config_applied
+    name: "18. Aguardar config_15 aplicada"
+    retry_interval_minutes: 1
+
+  - id: wait_timer
+    name: "19. Rodando config_15 [Piezo only | 200kHz/32768 | stats]"
+    purpose: "Piezo isolado. (P15-P1)×600 = E_piezo + TX_stats_piezo."
+    duration_hours: 1
+    duration_minutes: 0
+
+  # ---------------------------------------------------------------------------
+  # [GC] Acelerômetro isolado, 2kHz/4096 — mesmo tempo de aquisição (2.048s)
+  # que config_13. Isola diferença de corrente entre 16kHz e 2kHz.
+  # P_13 - P_16 = (I_accel_16k - I_accel_2k) × V × 2.048 / 600
+  # ---------------------------------------------------------------------------
+  - id: send_config
+    name: "20. Enviar config_16 [Accel only | 2kHz/4096 | stats]"
+    config_file: "configs/config_16.json"
+
+  - id: wait_config_applied
+    name: "21. Aguardar config_16 aplicada"
+    retry_interval_minutes: 1
+
+  - id: wait_timer
+    name: "22. Rodando config_16 [Accel only | 2kHz/4096 | stats]"
+    purpose: "Accel 2kHz (t_acq=2.048s igual ao 16kHz). P13-P16 calibra I_accel_2k vs I_accel_16k."
+    duration_hours: 1
+    duration_minutes: 0
+
+  # ---------------------------------------------------------------------------
+  # [GD] Todos os sensores, stats, periodS=300s — valida linearidade do modelo
+  # P_17 - P_sleep_radio ≈ 2 × (P_11 - P_sleep_radio)
+  # ---------------------------------------------------------------------------
+  - id: send_config
+    name: "23. Enviar config_17 [Todos sensores | 16kHz/32768 | stats | period=300s]"
+    config_file: "configs/config_17.json"
+
+  - id: wait_config_applied
+    name: "24. Aguardar config_17 aplicada"
+    retry_interval_minutes: 1
+
+  - id: wait_timer
+    name: "25. Rodando config_17 [Todos sensores | 16kHz/32768 | stats | period=300s]"
+    purpose: "Linearidade: period=300s (2× freq). P17-P1 ≈ 2×(P11-P1) valida modelo."
+    duration_hours: 1
     duration_minutes: 0

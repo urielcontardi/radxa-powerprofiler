@@ -36,6 +36,8 @@ class TestState:
         self.lock = threading.Lock()
         self.logs = []
         self.current_step = "Iniciando..."
+        self.current_config_file = ""
+        self.current_purpose = ""
         self.sensor_status = {}  # {sensor_id: "status"}
         self.start_time = datetime.now().isoformat()
         self.events = []
@@ -52,6 +54,11 @@ class TestState:
         with self.lock:
             self.current_step = step_name
 
+    def set_config(self, config_file: str, purpose: str = ""):
+        with self.lock:
+            self.current_config_file = config_file
+            self.current_purpose = purpose
+
     def update_sensor(self, sensor_id: str, status: str):
         with self.lock:
             self.sensor_status[sensor_id] = status
@@ -64,6 +71,8 @@ class TestState:
         with self.lock:
             return {
                 "current_step": self.current_step,
+                "current_config_file": self.current_config_file,
+                "current_purpose": self.current_purpose,
                 "start_time": self.start_time,
                 "logs": self.logs[-50:],  # Retorna últimos 50 logs para a UI
                 "sensor_status": self.sensor_status.copy(),
@@ -160,26 +169,68 @@ class TestContext:
         self.sensor_ids = sensor_ids
         self.expected_config_revisions: dict[str, int] = {}
         self.events: list[dict] = []
-        
+        self.current_config_file: str = ""
+
         # Inicializa status dos sensores no dashboard
         for sid in sensor_ids:
             STATE.update_sensor(sid, "Aguardando...")
 
-    def record(self, event: str, sensor_id: str = "", details: str = ""):
+    def record(self, event: str, sensor_id: str = "", details: str = "", **extra):
         evt = {
             "timestamp": datetime.now().isoformat(),
             "event": event,
             "sensor_id": sensor_id,
             "details": details,
+            **extra,
         }
         self.events.append(evt)
         STATE.add_event(evt)
 
     def save_report(self):
         path = os.environ.get("REPORT_JSON_PATH") or os.path.join(SCRIPT_DIR, "report.json")
+        report = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "measurement_windows": _build_measurement_windows(self.events),
+            "events": self.events,
+        }
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.events, f, indent=2, ensure_ascii=False)
+            json.dump(report, f, indent=2, ensure_ascii=False)
         log(f"Relatório salvo em {path}")
+
+
+# ---------------------------------------------------------------------------
+# Report helpers
+# ---------------------------------------------------------------------------
+def _build_measurement_windows(events: list) -> list:
+    """Extract structured measurement windows from the flat event list.
+
+    Each window corresponds to one wait_timer run and contains:
+      config_file, purpose, timer_start, timer_end, duration_s (actual).
+    """
+    windows = []
+    for i, evt in enumerate(events):
+        if evt.get("event") != "timer_started":
+            continue
+        window = {
+            "config_file": evt.get("config_file", ""),
+            "purpose": evt.get("purpose", ""),
+            "timer_start": evt.get("timestamp", ""),
+            "timer_end": None,
+            "duration_scheduled": evt.get("details", ""),
+            "duration_actual_s": None,
+        }
+        for later in events[i + 1:]:
+            if later.get("event") == "timer_finished":
+                window["timer_end"] = later.get("timestamp", "")
+                try:
+                    t0 = datetime.fromisoformat(window["timer_start"])
+                    t1 = datetime.fromisoformat(window["timer_end"])
+                    window["duration_actual_s"] = round((t1 - t0).total_seconds())
+                except Exception:
+                    pass
+                break
+        windows.append(window)
+    return windows
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +293,8 @@ def step_send_config(ctx: TestContext, step: dict) -> None:
     with open(config_path, "r", encoding="utf-8") as f:
         template = json.load(f)
 
+    ctx.current_config_file = config_file
+    STATE.set_config(config_file)
     log(f"Enviando config '{config_file}' para {len(ctx.sensor_ids)} sensores...")
 
     for sid in ctx.sensor_ids:
@@ -360,28 +413,37 @@ def step_wait_timer(ctx: TestContext, step: dict) -> None:
         label += f" {minutes:.0f}min"
     label = label.strip()
 
-    log(f"Timer iniciado: {label} ({int(total_s)}s)")
-    ctx.record("timer_started", details=label)
+    purpose = step.get("purpose", "")
+    config_file = ctx.current_config_file
+
+    STATE.set_config(config_file, purpose)
+    log(f"Timer iniciado: {label} ({int(total_s)}s)  config={config_file}")
+    if purpose:
+        log(f"  Objetivo: {purpose}")
+    ctx.record("timer_started", details=label, config_file=config_file, purpose=purpose)
 
     start = time.time()
     while True:
         remaining = total_s - (time.time() - start)
         if remaining <= 0:
             break
-        
-        # Atualiza status de todos os sensores para indicar que estão em teste
-        elapsed_h = (time.time() - start) / 3600
-        remaining_h = remaining / 3600
-        status_msg = f"Em teste: {label} (decorrido {elapsed_h:.1f}h, falta {remaining_h:.1f}h)"
+
+        elapsed_m = (time.time() - start) / 60
+        remaining_m = remaining / 60
+        status_msg = (
+            f"[{config_file}] {label} — "
+            f"{elapsed_m:.0f}min decorrido, {remaining_m:.0f}min restante"
+        )
         for sid in ctx.sensor_ids:
             STATE.update_sensor(sid, status_msg)
 
-        sleep_chunk = min(600, remaining)
+        sleep_chunk = min(60, remaining)
         time.sleep(sleep_chunk)
-        log(f"  Timer: {elapsed_h:.1f}h de {label}")
+        elapsed_m_now = (time.time() - start) / 60
+        log(f"  Timer: {elapsed_m_now:.0f}min de {label} | {config_file}")
 
-    ctx.record("timer_finished", details=label)
-    log(f"Timer concluído ({label}).")
+    ctx.record("timer_finished", details=label, config_file=config_file)
+    log(f"Timer concluído ({label}) — {config_file}.")
 
 
 # ---------------------------------------------------------------------------
@@ -487,7 +549,9 @@ HTML_TEMPLATE = """
         
         <div class="status-box">
             <div><span class="status-label">Etapa Atual:</span> <span id="current-step" class="status-value">Carregando...</span></div>
-            <div style="margin-top: 10px;"><span class="status-label">Início:</span> <span id="start-time">...</span></div>
+            <div style="margin-top: 8px;"><span class="status-label">Config Ativa:</span> <span id="current-config" style="font-family:monospace; color:#1a6e99;">...</span></div>
+            <div style="margin-top: 4px;"><span class="status-label">Objetivo:</span> <span id="current-purpose" style="color:#555; font-style:italic;">...</span></div>
+            <div style="margin-top: 8px;"><span class="status-label">Início:</span> <span id="start-time">...</span></div>
             <div><span class="status-label">Status:</span> <span id="running-status">...</span></div>
         </div>
 
@@ -517,6 +581,8 @@ HTML_TEMPLATE = """
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('current-step').textContent = data.current_step;
+                    document.getElementById('current-config').textContent = data.current_config_file || '—';
+                    document.getElementById('current-purpose').textContent = data.current_purpose || '—';
                     document.getElementById('start-time').textContent = new Date(data.start_time).toLocaleString();
                     document.getElementById('running-status').textContent = data.is_running ? "Executando" : "Parado";
                     
